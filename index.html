@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GitHub Repository Metadata Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root{--bg:#f6f8fa;--card:#fff;--text:#1f2328;--muted:#656d76;--border:#d0d7de;--accent:#2f81f7;--accent2:#8250df;--good:#1a7f37;--warn:#bf8700}
+@media (prefers-color-scheme:dark){:root{--bg:#0d1117;--card:#161b22;--text:#e6edf3;--muted:#8b949e;--border:#30363d;--accent:#58a6ff;--accent2:#bc8cff;--good:#3fb950;--warn:#d29922}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{padding:28px 20px 8px;max-width:1200px;margin:0 auto}
+header h1{margin:0 0 4px;font-size:26px}
+header p{margin:0;color:var(--muted)}
+nav{max-width:1200px;margin:12px auto 0;padding:0 20px;display:flex;gap:8px;flex-wrap:wrap}
+nav a{color:var(--text);text-decoration:none;border:1px solid var(--border);background:var(--card);padding:4px 12px;border-radius:999px;font-size:13px}
+nav a:hover{border-color:var(--accent)}
+main{max-width:1200px;margin:0 auto;padding:12px 20px 40px}
+h2{font-size:18px;margin:28px 0 10px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px}
+.kpi .v{font-size:24px;font-weight:700}
+.kpi .l{color:var(--muted);font-size:12.5px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px}
+.card h3{margin:0 0 2px;font-size:15px}
+.card .sub{margin:0 0 8px;color:var(--muted);font-size:12.5px}
+.chart{position:relative;height:300px}
+.chart.tall{height:420px}
+.note{background:var(--card);border:1px solid var(--border);border-left:4px solid var(--warn);border-radius:8px;padding:10px 14px;margin:10px 0;font-size:13.5px}
+.insight{border-left-color:var(--accent)}
+.wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--card)}
+.best{color:var(--good);font-weight:700}
+select{padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text)}
+.status{color:var(--muted);margin-left:10px;font-size:13px}
+.tablebox{max-height:440px;overflow:auto;border:1px solid var(--border);border-radius:8px}
+footer{text-align:center;color:var(--muted);font-size:12.5px;padding:20px}
+#err{display:none;background:#ffebe9;color:#82071e;border:1px solid #ff8182;padding:10px 14px;border-radius:8px;margin:12px 0}
+</style>
+</head>
+<body>
+<header>
+<h1>GitHub Repository Metadata</h1>
+<p>4.2 million public repositories with 5+ stars: quality, trends and a popularity model</p>
+</header>
+<nav>
+<a href="#overview">Overview</a><a href="#stars">Stars</a><a href="#languages">Languages</a><a href="#time">Time</a>
+<a href="#health">Repo health</a><a href="#topics">Topics</a><a href="#corr">Correlations</a><a href="#ml">Model</a><a href="#explore">Data explorer</a>
+</nav>
+<main>
+<div id="err"></div>
+
+<h2 id="overview">Overview</h2>
+<div class="kpis" id="kpis"></div>
+<div class="note insight" id="insight"></div>
+
+<h2 id="stars">Star distribution</h2>
+<div class="grid">
+<div class="card"><h3>Repositories by stars (log scale bins)</h3><p class="sub">Each bar is a quarter of a power of ten. A few repos have enormous star counts while most have few.</p><div class="chart"><canvas id="cStarsHist"></canvas></div></div>
+<div class="card"><h3>Star percentiles</h3><p class="sub">The typical repo has about a dozen stars.</p><div class="chart"><canvas id="cPct"></canvas></div></div>
+</div>
+
+<h2 id="languages">Languages</h2>
+<div class="grid">
+<div class="card"><h3>Top primary languages by repository count</h3><p class="sub">"Unknown" = no primary language reported.</p><div class="chart tall"><canvas id="cLang"></canvas></div></div>
+<div class="card"><h3>Language usage across all repo languages (bytes)</h3><p class="sub">Total code volume per language, in billions of bytes.</p><div class="chart tall"><canvas id="cLangBytes"></canvas></div></div>
+<div class="card"><h3>Share of repos active in the last year, by language</h3><p class="sub">Among the 15 largest languages.</p><div class="chart tall"><canvas id="cLangActive"></canvas></div></div>
+</div>
+
+<h2 id="time">Time and activity</h2>
+<div class="grid">
+<div class="card"><h3>Repositories by creation year</h3><p class="sub">Line shows the share still active in the last 365 days.</p><div class="chart"><canvas id="cCohort"></canvas></div></div>
+<div class="card"><h3>Median stars by recency of last push</h3><p class="sub">Median stars within each time-since-last-push bucket.</p><div class="chart"><canvas id="cRecency"></canvas></div></div>
+</div>
+
+<h2 id="health">Repository health</h2>
+<div class="grid">
+<div class="card"><h3>Licenses</h3><p class="sub">Top 10 by repo count.</p><div class="chart"><canvas id="cLicense"></canvas></div></div>
+<div class="card"><h3>Team size (assignable users)</h3><p class="sub">Bars: repos. Line: share with pull requests.</p><div class="chart"><canvas id="cCollab"></canvas></div></div>
+<div class="card"><h3>Repository size</h3><p class="sub">Bars: repos. Line: median commits.</p><div class="chart"><canvas id="cSize"></canvas></div></div>
+<div class="card"><h3>Archived vs active</h3><p class="sub">Median values.</p><div class="wrap" id="archTable"></div></div>
+</div>
+
+<h2 id="topics">Topics</h2>
+<div class="card"><h3>Top 20 topics by repository count</h3><p class="sub">Only 30% of repos have any topic.</p><div class="chart tall"><canvas id="cTopics"></canvas></div></div>
+
+<h2 id="corr">Correlations (Pearson on log1p)</h2>
+<div class="card"><p class="sub">Counts are heavily skewed, so values are log-transformed first. Darker = stronger correlation.</p><div class="wrap" id="corrTable"></div></div>
+
+<h2 id="ml">Predicting popular repositories (stars &ge; 100)</h2>
+<div class="note">Set <b>A</b> excludes forks and watchers. Set <b>B</b> includes them, but they are almost a proxy for stars, so B's higher scores are inflated. Treat <b>A</b> as the less circular result (issues and pull requests are still partly consequences of popularity). Random guessing would score a PR-AUC of about 0.098.</div>
+<div class="grid">
+<div class="card"><h3>PR-AUC by model</h3><div class="chart"><canvas id="cMl"></canvas></div></div>
+<div class="card"><h3>Test-set metrics</h3><div class="wrap" id="mlTable"></div></div>
+<div class="card"><h3>GBT feature importance: set A (no forks/watchers)</h3><div class="chart tall"><canvas id="cImpA"></canvas></div></div>
+<div class="card"><h3>GBT feature importance: set B (with forks/watchers)</h3><div class="chart tall"><canvas id="cImpB"></canvas></div></div>
+</div>
+
+<h2 id="explore">Data explorer</h2>
+<div class="card">
+<select id="file"></select><span class="status" id="status"></span>
+<div class="tablebox" style="margin-top:10px"><div id="exTable"></div></div>
+</div>
+</main>
+<footer>Built from a PySpark pipeline run on the GitHub Repository Metadata dataset. Data files are in the data/ folder.</footer>
+
+<script>
+const FILES = ["overview","stars_percentiles","stars_log_hist","language_summary","language_bytes","created_year_cohorts",
+ "recency_buckets","size_buckets","collab_buckets","license_summary","license_flag","archived_vs_active",
+ "topic_summary","correlation_log1p","ml_results","ml_feature_importance_gbt"];
+const $ = id => document.getElementById(id);
+const esc = v => String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function parseCSV(text){
+  const rows=[]; let row=[], f='', q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){ if(c==='"'&&text[i+1]==='"'){f+='"';i++;} else if(c==='"'){q=false;} else f+=c; }
+    else if(c==='"') q=true;
+    else if(c===','){row.push(f);f='';}
+    else if(c==='\n'){row.push(f);rows.push(row);row=[];f='';}
+    else if(c!=='\r') f+=c;
+  }
+  if(f.length||row.length){row.push(f);rows.push(row);}
+  const clean = rows.filter(r=>r.length>1||(r.length===1&&r[0]!==''));
+  const head = clean[0];
+  return clean.slice(1).map(r=>Object.fromEntries(head.map((h,i)=>[h, r[i]===undefined?'':r[i]])));
+}
+const num = v => (v===''||v===undefined)?null:Number(v);
+const fmt = n => n==null?'':Math.abs(n)>=1e9?(n/1e9).toFixed(2)+'B':Math.abs(n)>=1e6?(n/1e6).toFixed(2)+'M':Math.abs(n)>=1e3?(n/1e3).toFixed(1)+'K':(Number.isInteger(n)?String(n):n.toFixed(3));
+const pct = n => (n*100).toFixed(1)+'%';
+
+async function loadAll(){
+  const out={};
+  await Promise.all(FILES.map(async f=>{
+    const r=await fetch('data/'+f+'.csv');
+    if(!r.ok) throw new Error(f+'.csv: HTTP '+r.status);
+    out[f]=parseCSV(await r.text());
+  }));
+  return out;
+}
+
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function setupChartDefaults(){
+  Chart.defaults.color = css('--muted');
+  Chart.defaults.borderColor = css('--border');
+  Chart.defaults.font.family = 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
+  Chart.defaults.maintainAspectRatio = false;
+  Chart.defaults.plugins.legend.display = false;
+}
+function chart(id, cfg){ return new Chart($(id), cfg); }
+const bar = (labels, data, color, extra={}) => ({type:'bar', data:{labels, datasets:[{data, backgroundColor:color, borderRadius:3}]}, options:Object.assign({}, extra)});
+
+function table(el, head, rows, opts={}){
+  let h='<table><thead><tr>'+head.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr></thead><tbody>';
+  rows.forEach(r=>{ h+='<tr>'+r.map((c,i)=>{
+    const cls = opts.best && opts.best(r,i)?' class="best"':'';
+    const style = opts.style && opts.style(r,i) ? ' style="'+opts.style(r,i)+'"' : '';
+    return '<td'+cls+style+'>'+esc(c)+'</td>'; }).join('')+'</tr>'; });
+  el.innerHTML = h+'</tbody></table>';
+}
+
+function render(D){
+  setupChartDefaults();
+  const A=css('--accent'), B=css('--accent2');
+
+  // KPIs
+  const o=D.overview[0];
+  const kp=[[fmt(num(o.repos)),'repositories'],[fmt(num(o.total_stars)),'total stars'],
+    [pct(num(o.share_licensed)),'have a license'],[pct(num(o.share_with_topics)),'have topics'],
+    [pct(num(o.share_archived)),'archived'],[pct(num(o.share_active_365d_of_valid_dates)),'pushed in last year'],
+    [(num(o.median_age_days)/365.25).toFixed(1)+' yrs','median repo age']];
+  $('kpis').innerHTML = kp.map(([v,l])=>'<div class="kpi"><div class="v">'+esc(v)+'</div><div class="l">'+esc(l)+'</div></div>').join('');
+  $('insight').innerHTML = 'The top <b>1%</b> of repositories ('+fmt(num(o.repos_at_or_above_p99))+' repos with &ge; '+num(o.p99_stars_threshold)+' stars) hold <b>'+pct(num(o.share_of_all_stars_at_or_above_p99))+'</b> of all stars.';
+
+  // Stars
+  const h=D.stars_log_hist.filter(r=>r.log10_stars_lower!=='');
+  chart('cStarsHist', bar(h.map(r=>{const lo=Math.pow(10,num(r.log10_stars_lower));return lo>=1000?(lo/1000).toFixed(1)+'K':Math.round(lo)+'';}), h.map(r=>num(r.count)), A,
+    {scales:{y:{title:{display:true,text:'repositories'},ticks:{callback:v=>fmt(v)}},x:{title:{display:true,text:'stars (lower edge of bin)'}}}}));
+  chart('cPct', bar(D.stars_percentiles.map(r=>'p'+(num(r.percentile)*100).toFixed(num(r.percentile)>=0.99?1:0)), D.stars_percentiles.map(r=>num(r.stars)), B,
+    {plugins:{tooltip:{callbacks:{label:c=>c.parsed.y.toLocaleString()+' stars'}}},scales:{y:{type:'logarithmic',title:{display:true,text:'stars (log)'}}}}));
+
+  // Languages
+  const L=D.language_summary.slice(0,15);
+  chart('cLang', bar(L.map(r=>r.primary_language_clean), L.map(r=>num(r.repos)), A,
+    {indexAxis:'y',scales:{x:{ticks:{callback:v=>fmt(v)}}}}));
+  const LB=D.language_bytes.slice(0,15);
+  chart('cLangBytes', bar(LB.map(r=>r.language), LB.map(r=>num(r.total_bytes)/1e9), B,
+    {indexAxis:'y',plugins:{tooltip:{callbacks:{label:c=>c.parsed.x.toFixed(1)+' B bytes'}}}}));
+  const LA=[...L].filter(r=>r.primary_language_clean!=='Unknown').sort((a,b)=>num(b.share_active_365d)-num(a.share_active_365d));
+  chart('cLangActive', bar(LA.map(r=>r.primary_language_clean), LA.map(r=>num(r.share_active_365d)*100), A,
+    {indexAxis:'y',plugins:{tooltip:{callbacks:{label:c=>c.parsed.x.toFixed(1)+'%'}}},scales:{x:{ticks:{callback:v=>v+'%'}}}}));
+
+  // Time
+  const C=D.created_year_cohorts.filter(r=>r.created_year!=='');
+  chart('cCohort', {type:'bar', data:{labels:C.map(r=>r.created_year), datasets:[
+      {type:'bar',label:'Repos',data:C.map(r=>num(r.repos)),backgroundColor:A,yAxisID:'y',borderRadius:3},
+      {type:'line',label:'Active last 365d',data:C.map(r=>num(r.share_active_365d)*100),borderColor:B,backgroundColor:B,yAxisID:'y1',tension:.3,pointRadius:3}]},
+    options:{plugins:{legend:{display:true}},scales:{y:{ticks:{callback:v=>fmt(v)}},y1:{position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>v+'%'}}}}});
+  const R=D.recency_buckets;
+  chart('cRecency', bar(R.map(r=>r.bucket), R.map(r=>num(r.median_stars)), B,
+    {scales:{y:{title:{display:true,text:'median stars'}},x:{title:{display:true,text:'time since last push'}}}}));
+
+  // Health
+  const Li=D.license_summary.slice(0,10);
+  chart('cLicense', bar(Li.map(r=>r.license_clean.replace(' License','')), Li.map(r=>num(r.repos)), A,
+    {indexAxis:'y',scales:{x:{ticks:{callback:v=>fmt(v)}}}}));
+  const dual=(rows,lineKey,lineLabel,pctLine)=>({type:'bar',data:{labels:rows.map(r=>r.bucket),datasets:[
+      {type:'bar',label:'Repos',data:rows.map(r=>num(r.repos)),backgroundColor:A,yAxisID:'y',borderRadius:3},
+      {type:'line',label:lineLabel,data:rows.map(r=>pctLine?num(r[lineKey])*100:num(r[lineKey])),borderColor:B,backgroundColor:B,yAxisID:'y1',tension:.3,pointRadius:4}]},
+    options:{plugins:{legend:{display:true}},scales:{y:{ticks:{callback:v=>fmt(v)}},y1:{position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>pctLine?v+'%':v}}}}});
+  chart('cCollab', dual(D.collab_buckets,'share_with_pull_requests','Has pull requests',true));
+  chart('cSize', dual(D.size_buckets,'median_commits','Median commits',false));
+
+  const av=D.archived_vs_active;
+  const keys=['repos','median_stars','median_forks','median_watchers','median_pullRequests','median_issues','median_commits','median_age_days','median_days_since_push'];
+  const label=r=>r.isArchived==='True'||r.isArchived==='true'?'Archived':'Active';
+  table($('archTable'), ['Metric'].concat(av.map(label)),
+    keys.map(k=>[k.replace('median_','median ').replace('_',' ')].concat(av.map(r=>fmt(num(r[k]))))));
+
+  // Topics
+  const T=D.topic_summary.slice(0,20);
+  chart('cTopics', bar(T.map(r=>r.topic), T.map(r=>num(r.repos)), B, {indexAxis:'y',scales:{x:{ticks:{callback:v=>fmt(v)}}}}));
+
+  // Correlation heatmap
+  const cr=D.correlation_log1p, cols=Object.keys(cr[0]).filter(k=>k!=='variable');
+  const accentRGB = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+  table($('corrTable'), [''].concat(cols), cr.map(r=>[r.variable].concat(cols.map(c=>num(r[c]).toFixed(2)))),
+    {style:(r,i)=>{ if(i===0) return ''; const v=Math.abs(Number(r[i])); return 'background:color-mix(in srgb, '+accentRGB+' '+Math.round(v*80)+'%, transparent)'; }});
+
+  // ML
+  const ml=D.ml_results;
+  const names=ml.map(r=>(r.feature_set.startsWith('A')?'A':'B')+' / '+(r.model==='GBT'?'GBT':'LogReg'));
+  chart('cMl', bar(names, ml.map(r=>num(r.pr_auc)), ml.map(r=>r.feature_set.startsWith('A')?A:B),
+    {scales:{y:{min:0,max:1,title:{display:true,text:'PR-AUC'}}}}));
+  const bestA=Math.max(...ml.filter(r=>r.feature_set.startsWith('A')).map(r=>num(r.pr_auc)));
+  table($('mlTable'), ['Set','Model','Precision','Recall','F1','PR-AUC','ROC-AUC'],
+    ml.map(r=>[r.feature_set.startsWith('A')?'A (no forks/watchers)':'B (with forks/watchers)', r.model,
+      num(r.precision).toFixed(3),num(r.recall).toFixed(3),num(r.f1).toFixed(3),num(r.pr_auc).toFixed(3),num(r.roc_auc).toFixed(3)]),
+    {best:(r,i)=>i===5&&r[0].startsWith('A')&&Number(r[5])===Number(bestA.toFixed(3))});
+  const imp=(set)=>D.ml_feature_importance_gbt.filter(r=>r.feature_set.startsWith(set)).sort((a,b)=>num(b.importance)-num(a.importance)).slice(0,12);
+  const ia=imp('A'), ib=imp('B');
+  chart('cImpA', bar(ia.map(r=>r.feature.replace(/^log_/,'')), ia.map(r=>num(r.importance)), A, {indexAxis:'y'}));
+  chart('cImpB', bar(ib.map(r=>r.feature.replace(/^log_/,'')), ib.map(r=>num(r.importance)), B, {indexAxis:'y'}));
+
+  // Explorer
+  const sel=$('file');
+  FILES.forEach(f=>{const op=document.createElement('option');op.value=f;op.textContent=f+'.csv';sel.appendChild(op);});
+  const show=()=>{
+    const rows=D[sel.value]; const head=Object.keys(rows[0]||{});
+    table($('exTable'), head, rows.slice(0,500).map(r=>head.map(k=>r[k])));
+    $('status').textContent=rows.length+' rows'+(rows.length>500?' (first 500 shown)':'');
+  };
+  sel.addEventListener('change',show); show();
+}
+
+loadAll().then(render).catch(e=>{
+  const el=$('err'); el.style.display='block';
+  el.textContent='Could not load data: '+e.message+'. If you opened index.html directly from disk, serve the folder instead (python -m http.server) or view it on GitHub Pages.';
+  console.error(e);
+});
+</script>
+</body>
+</html>
